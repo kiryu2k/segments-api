@@ -6,6 +6,7 @@ import (
 	"net/http"
 
 	"github.com/kiryu-dev/segments-api/internal/config"
+	"github.com/kiryu-dev/segments-api/internal/service"
 	"github.com/kiryu-dev/segments-api/internal/transport"
 )
 
@@ -18,8 +19,9 @@ func main() {
 		log.Fatal(err)
 	}
 	var (
-		router = transport.New(nil)
-		server = &http.Server{
+		service = service.New(nil)
+		router  = transport.New(service)
+		server  = &http.Server{
 			Addr:         cfg.Address,
 			Handler:      router,
 			WriteTimeout: cfg.Timeout,
@@ -27,4 +29,7 @@ func main() {
 			IdleTimeout:  cfg.IdleTimeout,
 		}
 	)
+	if err := server.ListenAndServe(); err != nil {
+		log.Fatal(err)
+	}
 }
