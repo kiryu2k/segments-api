@@ -6,6 +6,8 @@ import (
 	"net/http"
 
 	"github.com/kiryu-dev/segments-api/internal/config"
+	"github.com/kiryu-dev/segments-api/internal/repository"
+	"github.com/kiryu-dev/segments-api/internal/repository/postgres"
 	"github.com/kiryu-dev/segments-api/internal/service"
 	"github.com/kiryu-dev/segments-api/internal/transport"
 )
@@ -18,8 +20,13 @@ func main() {
 	if err != nil {
 		log.Fatal(err)
 	}
+	db, err := postgres.New(&cfg.DB)
+	if err != nil {
+		log.Fatal(err)
+	}
 	var (
-		service = service.New(nil)
+		repo    = repository.New(db)
+		service = service.New(repo)
 		router  = transport.New(service)
 		server  = &http.Server{
 			Addr:         cfg.Address,
