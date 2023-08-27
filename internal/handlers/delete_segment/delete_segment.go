@@ -3,8 +3,11 @@ package delete_segment
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"net/http"
 	"time"
+
+	"github.com/kiryu-dev/segments-api/internal/repository"
 )
 
 type segmentDeleter interface {
@@ -26,10 +29,14 @@ func New(service segmentDeleter) http.HandlerFunc {
 		defer r.Body.Close()
 		ctx, cancel := context.WithTimeout(r.Context(), time.Minute)
 		defer cancel()
-		if err := service.Delete(ctx, data.Slug); err != nil {
-			w.WriteHeader(http.StatusInternalServerError)
-			w.Write([]byte("deleting error"))
+		err := service.Delete(ctx, data.Slug)
+		if errors.Is(err, repository.ErrSegmentNotExists) {
+			w.WriteHeader(http.StatusBadRequest)
+			w.Write([]byte("requested segment doesn't exist"))
 			return
+		}
+		if err != nil {
+			w.WriteHeader(http.StatusInternalServerError)
 		}
 	}
 }

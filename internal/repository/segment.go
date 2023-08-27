@@ -3,8 +3,14 @@ package repository
 import (
 	"context"
 	"database/sql"
+	"fmt"
 
 	"github.com/kiryu-dev/segments-api/internal/model"
+)
+
+var (
+	ErrSegmentExists    = fmt.Errorf("specified segment already exists")
+	ErrSegmentNotExists = fmt.Errorf("specified segment doesn't exist")
 )
 
 type segmentRepository struct {
@@ -16,10 +22,22 @@ func New(db *sql.DB) *segmentRepository {
 }
 
 func (s *segmentRepository) Create(ctx context.Context, slug string) error {
+	query := `INSERT INTO segment (slug) VALUES ($1);`
+	if _, err := s.db.ExecContext(ctx, query, slug); err != nil {
+		return ErrSegmentExists
+	}
 	return nil
 }
 
 func (s *segmentRepository) Delete(ctx context.Context, slug string) error {
+	query := `DELETE FROM segment WHERE slug = $1;`
+	res, err := s.db.ExecContext(ctx, query, slug)
+	if err != nil {
+		return fmt.Errorf("error deleting segment with name %s: %v", slug, err)
+	}
+	if count, _ := res.RowsAffected(); count == 0 {
+		return ErrSegmentNotExists
+	}
 	return nil
 }
 

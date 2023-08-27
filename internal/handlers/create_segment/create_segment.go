@@ -28,8 +28,6 @@ func New(service segmentCreator) http.HandlerFunc {
 		defer cancel()
 		if err := service.Create(ctx, data.Slug); err != nil {
 			w.WriteHeader(http.StatusInternalServerError)
-			w.Write([]byte("creating error"))
-			return
 		}
 	}
 }
