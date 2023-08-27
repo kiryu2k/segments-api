@@ -21,12 +21,13 @@ type HTTPServer struct {
 }
 
 type DB struct {
-	Host     string `yaml:"host" env-default:"postgres"`
-	DBName   string `yaml:"dbname" env-required:"true"`
-	Username string `yaml:"username" env-required:"true"`
-	Password string `env:"DB_PASSWORD"`
-	Port     string `yaml:"port" env-default:"5432"`
-	SSLMode  string `yaml:"sslmode" env-default:"disable"`
+	Host         string `yaml:"host" env-default:"postgres"`
+	DBName       string `yaml:"dbname" env-required:"true"`
+	Username     string `yaml:"username" env-required:"true"`
+	Password     string `env:"DB_PASSWORD"`
+	Port         string `yaml:"port" env-default:"5432"`
+	SSLMode      string `yaml:"sslmode" env-default:"disable"`
+	InitFilepath string `yaml:"init_filepath" env-required:"true"`
 }
 
 func LoadConfig(configPath string) (*Config, error) {
@@ -44,4 +45,9 @@ func LoadConfig(configPath string) (*Config, error) {
 		return nil, fmt.Errorf("cannot load config: %s", err)
 	}
 	return config, nil
+}
+
+func (d DB) String() string {
+	return fmt.Sprintf("host=%s port=%s user=%s dbname=%s password=%s sslmode=%s",
+		d.Host, d.Port, d.Username, d.DBName, d.Password, d.SSLMode)
 }

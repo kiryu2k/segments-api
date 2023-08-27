@@ -1,9 +1,10 @@
 db:
-  host: "db"
+  host: "localhost"
   port: "5432"
   username: "kirrryu"
   dbname: "segments"
   sslmode: "disable"
+  init_filepath: "./sql/init.sql"
 http_server:
   address: ":8080"
   timeout: 1s
