@@ -15,8 +15,15 @@ type segmentRepository interface {
 	GetActiveUserSegments(context.Context, uint64) ([]string, error)
 }
 
+type changeFunc func(context.Context, *model.UserSegment) error
+
 type SegmentService struct {
 	repo segmentRepository
+}
+
+type segmentError struct {
+	idx int
+	err error
 }
 
 func New(repo segmentRepository) *SegmentService {
@@ -31,36 +38,44 @@ func (s *SegmentService) Delete(ctx context.Context, slug string) error {
 	return s.repo.Delete(ctx, slug)
 }
 
-func (s *SegmentService) AddToUser(ctx context.Context, segments []*model.UserSegment) <-chan *model.ErrSegmentInfo {
+func (s *SegmentService) Change(ctx context.Context, seg []*model.UserSegment, opType int) []error {
+	var (
+		fn   changeFunc
+		errs = make([]error, len(seg))
+	)
+	switch opType {
+	case model.AddOp:
+		fn = s.repo.AddToUser
+	case model.DeleteOp:
+		fn = s.repo.DeleteFromUser
+	}
+	for segErr := range changeSegments(ctx, seg, fn) {
+		errs[segErr.idx] = segErr.err
+	}
+	return errs
+}
+
+func changeSegments(ctx context.Context, seg []*model.UserSegment,
+	fn changeFunc) <-chan *segmentError {
 	var (
 		wg  = &sync.WaitGroup{}
-		out = make(chan *model.ErrSegmentInfo)
+		out = make(chan *segmentError)
 	)
-	wg.Add(len(segments))
-	for _, seg := range segments {
-		go func(ctx context.Context, seg *model.UserSegment) {
+	wg.Add(len(seg))
+	for i, s := range seg {
+		go func(ctx context.Context, i int, seg *model.UserSegment) {
 			defer wg.Done()
-			err := s.repo.AddToUser(ctx, seg)
-			if err != nil {
-				out <- &model.ErrSegmentInfo{
-					Slug:    seg.Slug,
-					Message: err.Error(),
-				}
+			out <- &segmentError{
+				idx: i,
+				err: fn(ctx, seg),
 			}
-		}(ctx, seg)
+		}(ctx, i, s)
 	}
 	go func() {
 		wg.Wait()
 		close(out)
 	}()
 	return out
-}
-
-func (s *SegmentService) DeleteFromUser(ctx context.Context, seg *model.UserSegment) error {
-	// if len(seg.Slugs) == 0 {
-	// 	return nil
-	// }
-	return s.repo.DeleteFromUser(ctx, seg)
 }
 
 func (s *SegmentService) GetActiveUserSegments(ctx context.Context, userID uint64) ([]string, error) {

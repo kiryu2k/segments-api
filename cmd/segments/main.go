@@ -8,7 +8,7 @@ import (
 
 	"github.com/gorilla/mux"
 	"github.com/kiryu-dev/segments-api/internal/config"
-	"github.com/kiryu-dev/segments-api/internal/handlers/add_user_segments"
+	"github.com/kiryu-dev/segments-api/internal/handlers/change_user_segments"
 	"github.com/kiryu-dev/segments-api/internal/handlers/create_segment"
 	"github.com/kiryu-dev/segments-api/internal/handlers/delete_segment"
 	"github.com/kiryu-dev/segments-api/internal/repository"
@@ -55,7 +55,7 @@ func setupRoutes(service *service.SegmentService) *mux.Router {
 	router := mux.NewRouter()
 	router.HandleFunc("/segment", create_segment.New(service)).Methods(http.MethodPost)
 	router.HandleFunc("/segment", delete_segment.New(service)).Methods(http.MethodDelete)
-	router.HandleFunc("/user-segments", add_user_segments.New(service)).Methods(http.MethodPost)
+	router.HandleFunc("/user-segments", change_user_segments.New(service)).Methods(http.MethodPost)
 	router.HandleFunc("/user-segments", nil).Methods(http.MethodGet)
 	return router
 }
