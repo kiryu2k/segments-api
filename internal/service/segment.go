@@ -31,10 +31,10 @@ func (s *SegmentService) Delete(ctx context.Context, slug string) error {
 	return s.repo.Delete(ctx, slug)
 }
 
-func (s *SegmentService) AddToUser(ctx context.Context, segments []*model.UserSegment) <-chan model.ErrSegmentInfo {
+func (s *SegmentService) AddToUser(ctx context.Context, segments []*model.UserSegment) <-chan *model.ErrSegmentInfo {
 	var (
 		wg  = &sync.WaitGroup{}
-		out = make(chan model.ErrSegmentInfo)
+		out = make(chan *model.ErrSegmentInfo)
 	)
 	wg.Add(len(segments))
 	for _, seg := range segments {
@@ -42,7 +42,7 @@ func (s *SegmentService) AddToUser(ctx context.Context, segments []*model.UserSe
 			defer wg.Done()
 			err := s.repo.AddToUser(ctx, seg)
 			if err != nil {
-				out <- model.ErrSegmentInfo{
+				out <- &model.ErrSegmentInfo{
 					Slug:    seg.Slug,
 					Message: err.Error(),
 				}

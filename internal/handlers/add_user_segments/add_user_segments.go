@@ -12,7 +12,7 @@ import (
 )
 
 type segmentsAdder interface {
-	AddToUser(context.Context, []*model.UserSegment) <-chan model.ErrSegmentInfo
+	AddToUser(context.Context, []*model.UserSegment) <-chan *model.ErrSegmentInfo
 }
 
 type duration struct {
@@ -58,10 +58,12 @@ func New(service segmentsAdder) http.HandlerFunc {
 				DeleteTime: seg.TTL.toDeleteTime(),
 			}
 		}
-		ch := service.AddToUser(ctx, segments)
-		resp := make([]*model.ErrSegmentInfo, 0)
+		var (
+			ch   = service.AddToUser(ctx, segments)
+			resp = make([]*model.ErrSegmentInfo, 0)
+		)
 		for errInfo := range ch {
-			resp = append(resp, &errInfo)
+			resp = append(resp, errInfo)
 		}
 		if err := json.NewEncoder(w).Encode(resp); err != nil {
 			w.WriteHeader(http.StatusInternalServerError)
