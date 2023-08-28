@@ -41,39 +41,28 @@ func (s *segmentRepository) Delete(ctx context.Context, slug string) error {
 	return nil
 }
 
-func (s *segmentRepository) AddToUser(ctx context.Context, seg *model.UserSegments) error {
-	tx, err := s.db.BeginTx(ctx, nil)
-	if err != nil {
-		return err
-	}
+func (s *segmentRepository) AddToUser(ctx context.Context, seg *model.UserSegment) error {
 	var (
-		searchQuery = `SELECT id FROM segment WHERE slug = $1`
-		insertQuery = `
+		segmentID     uint64
+		searchIDQuery = `SELECT id FROM segment WHERE slug = $1`
+		insertQuery   = `
 INSERT INTO users_segments (user_id, segment_id, delete_time)
 VALUES ($1, $2, $3);
 		`
 	)
-	for _, segment := range seg.Segments {
-		var id uint64
-		err := tx.QueryRowContext(ctx, searchQuery, segment.Slug).Scan(&id)
-		if err != nil {
-			if rErr := tx.Rollback(); rErr != nil {
-				return fmt.Errorf("transaction error: %w, rollback error: %w", err, rErr)
-			}
-			return ErrSegmentNotExists
-		}
-		_, err = tx.ExecContext(ctx, insertQuery, seg.UserID, id, segment.DeleteTime)
-		if err != nil {
-			if rErr := tx.Rollback(); rErr != nil {
-				return fmt.Errorf("transaction error: %w, rollback error: %w", err, rErr)
-			}
-			return err
-		}
+	err := s.db.QueryRowContext(ctx, searchIDQuery, seg.Slug).Scan(&segmentID)
+	if err == sql.ErrNoRows {
+		return ErrSegmentNotExists
 	}
-	return tx.Commit()
+	if err != nil {
+		return fmt.Errorf("error adding segment %s to user with ID %d: %v",
+			seg.Slug, seg.UserID, err)
+	}
+	_, err = s.db.ExecContext(ctx, insertQuery, seg.UserID, segmentID, seg.DeleteTime)
+	return err
 }
 
-func (s *segmentRepository) DeleteFromUser(ctx context.Context, seg *model.UserSegments) error {
+func (s *segmentRepository) DeleteFromUser(ctx context.Context, seg *model.UserSegment) error {
 	return nil
 }
 

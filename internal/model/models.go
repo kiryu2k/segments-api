@@ -2,12 +2,13 @@ package model
 
 import "time"
 
-type Segment struct {
+type UserSegment struct {
+	UserID     uint64     `json:"user_id"`
 	Slug       string     `json:"slug"`
 	DeleteTime *time.Time `json:"delete_time"`
 }
 
-type UserSegments struct {
-	UserID   uint64    `json:"user_id"`
-	Segments []Segment `json:"segments"`
+type ErrSegmentInfo struct {
+	Slug    string `json:"slug"`
+	Message string `json:"message"`
 }
