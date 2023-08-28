@@ -51,19 +51,32 @@ func New(service segmentChanger) http.HandlerFunc {
 		defer r.Body.Close()
 		data := new(request)
 		err = json.Unmarshal(body, data)
-		if err != nil || len(data.ToAdd) == 0 {
+		if err != nil || len(data.ToAdd) == 0 && len(data.ToDelete) == 0 {
 			w.WriteHeader(http.StatusBadRequest)
 			w.Write([]byte("invalid data to change user's segments"))
 			return
 		}
 		ctx, cancel := context.WithTimeout(r.Context(), 10*time.Second)
 		defer cancel()
+		/* TODO: function that convert slice to UserSegment model */
+		toDel := make([]*model.UserSegment, len(data.ToDelete))
+		for i, slug := range data.ToDelete {
+			toDel[i] = &model.UserSegment{
+				UserID: data.UserID,
+				Slug:   slug,
+			}
+		}
 		var (
-			errs = service.Change(ctx, data.ToAdd.makeSegmentModel(data.UserID), model.AddOp)
-			resp = make([]*response, len(errs))
+			addErr = service.Change(ctx, data.ToAdd.makeSegmentModel(data.UserID), model.AddOp)
+			offset = len(addErr)
+			delErr = service.Change(ctx, toDel, model.DeleteOp)
+			resp   = make([]*response, offset+len(delErr))
 		)
-		for i, err := range errs {
+		for i, err := range addErr {
 			resp[i] = createResponse(err, data.ToAdd[i].Slug, model.AddOp)
+		}
+		for i, err := range delErr {
+			resp[offset+i] = createResponse(err, data.ToDelete[i], model.DeleteOp)
 		}
 		if err := json.NewEncoder(w).Encode(resp); err != nil {
 			w.WriteHeader(http.StatusInternalServerError)

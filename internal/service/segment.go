@@ -12,7 +12,7 @@ type segmentRepository interface {
 	Delete(context.Context, string) error
 	AddToUser(context.Context, *model.UserSegment) error
 	DeleteFromUser(context.Context, *model.UserSegment) error
-	GetActiveUserSegments(context.Context, uint64) ([]string, error)
+	GetUserSegments(context.Context, uint64) ([]string, error)
 }
 
 type changeFunc func(context.Context, *model.UserSegment) error
@@ -78,6 +78,6 @@ func changeSegments(ctx context.Context, seg []*model.UserSegment,
 	return out
 }
 
-func (s *SegmentService) GetActiveUserSegments(ctx context.Context, userID uint64) ([]string, error) {
-	return s.repo.GetActiveUserSegments(ctx, userID)
+func (s *SegmentService) GetUserSegments(ctx context.Context, userID uint64) ([]string, error) {
+	return s.repo.GetUserSegments(ctx, userID)
 }
