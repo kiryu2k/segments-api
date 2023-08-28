@@ -11,6 +11,7 @@ import (
 var (
 	ErrSegmentExists    = fmt.Errorf("specified segment already exists")
 	ErrSegmentNotExists = fmt.Errorf("specified segment doesn't exist")
+	ErrHasSegment       = fmt.Errorf("user already has specified segment")
 )
 
 type segmentRepository struct {
@@ -43,20 +44,28 @@ func (s *segmentRepository) Delete(ctx context.Context, slug string) error {
 
 func (s *segmentRepository) AddToUser(ctx context.Context, seg *model.UserSegment) error {
 	var (
-		segmentID     uint64
-		searchIDQuery = `SELECT id FROM segment WHERE slug = $1`
-		insertQuery   = `
+		segmentID            uint64
+		searchQuery          = `SELECT id FROM segment WHERE slug = $1`
+		searchDuplicateQuery = `
+SELECT user_id FROM users_segments
+WHERE user_id = $1 AND segment_id = $2;
+`
+		insertQuery = `
 INSERT INTO users_segments (user_id, segment_id, delete_time)
 VALUES ($1, $2, $3);
 		`
 	)
-	err := s.db.QueryRowContext(ctx, searchIDQuery, seg.Slug).Scan(&segmentID)
+	err := s.db.QueryRowContext(ctx, searchQuery, seg.Slug).Scan(&segmentID)
 	if err == sql.ErrNoRows {
 		return ErrSegmentNotExists
 	}
 	if err != nil {
 		return fmt.Errorf("error adding segment %s to user with ID %d: %v",
 			seg.Slug, seg.UserID, err)
+	}
+	err = s.db.QueryRowContext(ctx, searchDuplicateQuery, seg.UserID, segmentID).Scan()
+	if err != sql.ErrNoRows {
+		return ErrHasSegment
 	}
 	_, err = s.db.ExecContext(ctx, insertQuery, seg.UserID, segmentID, seg.DeleteTime)
 	return err
