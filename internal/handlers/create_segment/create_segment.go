@@ -24,7 +24,7 @@ func New(service segmentCreator) http.HandlerFunc {
 			return
 		}
 		defer r.Body.Close()
-		ctx, cancel := context.WithTimeout(r.Context(), time.Minute)
+		ctx, cancel := context.WithTimeout(r.Context(), 10*time.Second)
 		defer cancel()
 		if err := service.Create(ctx, data.Slug); err != nil {
 			w.WriteHeader(http.StatusInternalServerError)

@@ -29,11 +29,6 @@ type request struct {
 	Segments []segment `json:"segments"`
 }
 
-type response struct {
-	Slug  string `json:"slug"`
-	Cause string `json:"failure_cause"`
-}
-
 func New(service segmentsAdder) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		body, err := io.ReadAll(r.Body)
@@ -48,7 +43,7 @@ func New(service segmentsAdder) http.HandlerFunc {
 			w.Write([]byte("invalid data for adding user to segments"))
 			return
 		}
-		ctx, cancel := context.WithTimeout(r.Context(), time.Second)
+		ctx, cancel := context.WithTimeout(r.Context(), 10*time.Second)
 		defer cancel()
 		segments := make([]*model.UserSegment, len(data.Segments))
 		for i, seg := range data.Segments {

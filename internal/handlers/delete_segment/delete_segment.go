@@ -27,7 +27,7 @@ func New(service segmentDeleter) http.HandlerFunc {
 			return
 		}
 		defer r.Body.Close()
-		ctx, cancel := context.WithTimeout(r.Context(), time.Minute)
+		ctx, cancel := context.WithTimeout(r.Context(), 10*time.Second)
 		defer cancel()
 		err := service.Delete(ctx, data.Slug)
 		if errors.Is(err, repository.ErrSegmentNotExists) {
