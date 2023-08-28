@@ -72,6 +72,7 @@ func New(service segmentChanger) http.HandlerFunc {
 			delErr = service.Change(ctx, toDel, model.DeleteOp)
 			resp   = make([]*response, offset+len(delErr))
 		)
+		w.Header().Add("Content-Type", "encoding/json")
 		for i, err := range addErr {
 			resp[i] = createResponse(err, data.ToAdd[i].Slug, model.AddOp)
 		}

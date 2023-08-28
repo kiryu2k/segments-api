@@ -12,6 +12,7 @@ var (
 	ErrSegmentExists    = fmt.Errorf("specified segment already exists")
 	ErrSegmentNotExists = fmt.Errorf("specified segment doesn't exist")
 	ErrHasSegment       = fmt.Errorf("user already has specified segment")
+	ErrUserNotExists    = fmt.Errorf("user with specified id doesn't exist")
 )
 
 type segmentRepository struct {
@@ -91,7 +92,28 @@ WHERE user_id = $1 AND segment_id = $2;
 }
 
 func (s *segmentRepository) GetUserSegments(ctx context.Context, userID uint64) ([]string, error) {
-	return nil, nil
+	var (
+		query = `
+SELECT slug FROM segment JOIN users_segments
+ON id = segment_id AND user_id = $1;
+		`
+		segments = make([]string, 0)
+	)
+	rows, err := s.db.QueryContext(ctx, query, userID)
+	if err != nil {
+		return nil, fmt.Errorf("error getting segments of user with ID %d: %v", userID, err)
+	}
+	for rows.Next() {
+		var segment string
+		if err := rows.Scan(&segment); err != nil {
+			return nil, fmt.Errorf("error getting segments of user with ID %d: %v", userID, err)
+		}
+		segments = append(segments, segment)
+	}
+	if len(segments) == 0 {
+		return nil, ErrUserNotExists
+	}
+	return segments, nil
 }
 
 func (s *segmentRepository) getSegmentID(ctx context.Context, slug string) (uint64, error) {
