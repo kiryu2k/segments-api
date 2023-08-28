@@ -36,6 +36,7 @@ type request struct {
 
 type response struct {
 	Slug       string `json:"slug"`
+	OpType     string `json:"operation_type"`
 	StatusCode int    `json:"status_code"`
 	Message    string `json:"message"`
 }
@@ -62,25 +63,33 @@ func New(service segmentChanger) http.HandlerFunc {
 			resp = make([]*response, len(errs))
 		)
 		for i, err := range errs {
-			resp[i] = &response{
-				Slug:       data.ToAdd[i].Slug,
-				StatusCode: http.StatusOK,
-			}
-			if errors.Is(err, repository.ErrSegmentNotExists) ||
-				errors.Is(err, repository.ErrHasSegment) {
-				resp[i].StatusCode = http.StatusBadRequest
-				resp[i].Message = err.Error()
-				continue
-			}
-			if err != nil {
-				resp[i].StatusCode = http.StatusInternalServerError
-			}
-
+			resp[i] = createResponse(err, data.ToAdd[i].Slug, model.AddOp)
 		}
 		if err := json.NewEncoder(w).Encode(resp); err != nil {
 			w.WriteHeader(http.StatusInternalServerError)
 		}
 	}
+}
+
+func createResponse(err error, slug string, opType int) *response {
+	resp := &response{
+		Slug:       slug,
+		StatusCode: http.StatusOK,
+	}
+	switch opType {
+	case model.AddOp:
+		resp.OpType = "add"
+	case model.DeleteOp:
+		resp.OpType = "delete"
+	}
+	if errors.Is(err, repository.ErrSegmentNotExists) ||
+		errors.Is(err, repository.ErrHasSegment) {
+		resp.StatusCode = http.StatusBadRequest
+		resp.Message = err.Error()
+	} else if err != nil {
+		resp.StatusCode = http.StatusInternalServerError
+	}
+	return resp
 }
 
 func (s segments) makeSegmentModel(userID uint64) []*model.UserSegment {
