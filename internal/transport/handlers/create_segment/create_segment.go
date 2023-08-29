@@ -3,6 +3,7 @@ package create_segment
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"net/http"
 	"time"
 
@@ -26,9 +27,14 @@ func New(service segmentCreator) http.HandlerFunc {
 			return
 		}
 		defer r.Body.Close()
-		if err := validation.ValidateSlug(data.Slug); err != nil {
+		err := validation.ValidateSlug(data.Slug)
+		if errors.Is(err, validation.ErrInvalidChar) || errors.Is(err, validation.ErrInvalidSize) {
 			w.WriteHeader(http.StatusBadRequest)
 			w.Write([]byte(err.Error()))
+			return
+		}
+		if err != nil {
+			w.WriteHeader(http.StatusInternalServerError)
 			return
 		}
 		ctx, cancel := context.WithTimeout(r.Context(), 10*time.Second)
