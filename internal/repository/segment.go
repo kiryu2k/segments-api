@@ -6,7 +6,7 @@ import (
 	"fmt"
 
 	"github.com/kiryu-dev/segments-api/internal/model"
-	"github.com/kiryu-dev/segments-api/pkg/util"
+	"github.com/kiryu-dev/segments-api/pkg/util/parser"
 )
 
 var (
@@ -110,7 +110,7 @@ RETURNING (user_id, slug);
 		if err := rows.Scan(&buf); err != nil {
 			return nil, fmt.Errorf("error getting deleted users' segments: %v", err)
 		}
-		id, slug := util.ParseResponse(buf)
+		id, slug := parser.ParseResponse(buf)
 		segments = append(segments, &model.UserSegment{
 			UserID: id,
 			Slug:   slug,
