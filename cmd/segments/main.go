@@ -55,7 +55,7 @@ func main() {
 func setupRoutes(service *service.SegmentService) *mux.Router {
 	router := mux.NewRouter()
 	router.HandleFunc("/segment", create_segment.New(service)).Methods(http.MethodPost)
-	router.HandleFunc("/segment", delete_segment.New(service)).Methods(http.MethodDelete)
+	router.HandleFunc("/segment/{slug}", delete_segment.New(service)).Methods(http.MethodDelete)
 	router.HandleFunc("/user-segments", change_user_segments.New(service)).Methods(http.MethodPost)
 	router.HandleFunc("/user-segments/{userID}", get_user_segments.New(service)).Methods(http.MethodGet)
 	return router
