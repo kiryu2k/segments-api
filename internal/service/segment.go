@@ -3,6 +3,7 @@ package service
 import (
 	"context"
 	"sync"
+	"time"
 
 	"github.com/kiryu-dev/segments-api/internal/model"
 )
@@ -13,6 +14,7 @@ type segmentRepository interface {
 	AddToUser(context.Context, *model.UserSegment) error
 	DeleteFromUser(context.Context, *model.UserSegment) error
 	GetUserSegments(context.Context, uint64) ([]string, error)
+	DeleteByTTL(context.Context) error
 }
 
 type changeFunc func(context.Context, *model.UserSegment) error
@@ -80,4 +82,10 @@ func changeSegments(ctx context.Context, seg []*model.UserSegment,
 
 func (s *SegmentService) GetUserSegments(ctx context.Context, userID uint64) ([]string, error) {
 	return s.repo.GetUserSegments(ctx, userID)
+}
+
+func (s *SegmentService) DeleteByTTL() error {
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+	return s.repo.DeleteByTTL(ctx)
 }

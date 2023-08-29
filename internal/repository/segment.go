@@ -116,6 +116,15 @@ ON id = segment_id AND user_id = $1;
 	return segments, nil
 }
 
+func (s *segmentRepository) DeleteByTTL(ctx context.Context) error {
+	query := `DELETE FROM users_segments WHERE delete_time < NOW();`
+	_, err := s.db.ExecContext(ctx, query)
+	if err != nil {
+		return fmt.Errorf("error deleting time expired segments: %v", err)
+	}
+	return nil
+}
+
 func (s *segmentRepository) getSegmentID(ctx context.Context, slug string) (uint64, error) {
 	var (
 		id    uint64

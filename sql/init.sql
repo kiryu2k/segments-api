@@ -6,7 +6,7 @@ CREATE TABLE IF NOT EXISTS segment (
 CREATE TABLE IF NOT EXISTS users_segments (
     user_id INTEGER NOT NULL,
     segment_id SERIAL REFERENCES segment (id) ON DELETE CASCADE,
-    delete_time TIMESTAMP
+    delete_time TIMESTAMPTZ
 );
 
 CREATE TABLE IF NOT EXISTS logs (

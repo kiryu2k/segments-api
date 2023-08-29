@@ -50,6 +50,14 @@ func main() {
 		}
 	)
 	go func() {
+		for {
+			if err := service.DeleteByTTL(); err != nil {
+				log.Println(err)
+			}
+			time.Sleep(1 * time.Minute)
+		}
+	}()
+	go func() {
 		log.Println("server is starting...")
 		if err := server.ListenAndServe(); err != nil {
 			log.Printf("failed to start server: %v", err)
