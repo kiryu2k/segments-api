@@ -12,13 +12,15 @@ import (
 
 	"github.com/gorilla/mux"
 	"github.com/kiryu-dev/segments-api/internal/config"
-	"github.com/kiryu-dev/segments-api/internal/handlers/change_user_segments"
-	"github.com/kiryu-dev/segments-api/internal/handlers/create_segment"
-	"github.com/kiryu-dev/segments-api/internal/handlers/delete_segment"
-	"github.com/kiryu-dev/segments-api/internal/handlers/get_user_segments"
 	"github.com/kiryu-dev/segments-api/internal/repository"
 	"github.com/kiryu-dev/segments-api/internal/repository/postgres"
-	"github.com/kiryu-dev/segments-api/internal/service"
+	"github.com/kiryu-dev/segments-api/internal/service/logs"
+	"github.com/kiryu-dev/segments-api/internal/service/segment"
+	"github.com/kiryu-dev/segments-api/internal/transport/handlers/change_user_segments"
+	"github.com/kiryu-dev/segments-api/internal/transport/handlers/create_segment"
+	"github.com/kiryu-dev/segments-api/internal/transport/handlers/delete_segment"
+	"github.com/kiryu-dev/segments-api/internal/transport/handlers/get_user_logs"
+	"github.com/kiryu-dev/segments-api/internal/transport/handlers/get_user_segments"
 )
 
 func main() {
@@ -38,11 +40,12 @@ func main() {
 	}
 	defer db.Close()
 	var (
-		logger  = repository.NewLogger(db)
-		repo    = repository.New(db)
-		service = service.New(repo, logger)
-		router  = setupRoutes(service)
-		server  = &http.Server{
+		loggerRepo  = repository.NewLogger(db)
+		segmentRepo = repository.New(db)
+		logger      = logs.New(loggerRepo)
+		segment     = segment.New(segmentRepo, loggerRepo)
+		router      = setupRoutes(segment, logger)
+		server      = &http.Server{
 			Addr:         cfg.Address,
 			Handler:      router,
 			WriteTimeout: cfg.Timeout,
@@ -52,7 +55,7 @@ func main() {
 	)
 	go func() {
 		for {
-			if err := service.DeleteByTTL(); err != nil {
+			if err := segment.DeleteByTTL(); err != nil {
 				log.Println(err)
 			}
 			time.Sleep(1 * time.Minute)
@@ -75,11 +78,16 @@ func main() {
 	}
 }
 
-func setupRoutes(service *service.SegmentService) *mux.Router {
+func setupRoutes(segment *segment.Service, logger *logs.Service) *mux.Router {
 	router := mux.NewRouter()
-	router.HandleFunc("/segment", create_segment.New(service)).Methods(http.MethodPost)
-	router.HandleFunc("/segment/{slug}", delete_segment.New(service)).Methods(http.MethodDelete)
-	router.HandleFunc("/user-segments", change_user_segments.New(service)).Methods(http.MethodPost)
-	router.HandleFunc("/user-segments/{userID}", get_user_segments.New(service)).Methods(http.MethodGet)
+	{
+		router.HandleFunc("/segment", create_segment.New(segment)).Methods(http.MethodPost)
+		router.HandleFunc("/segment/{slug}", delete_segment.New(segment)).Methods(http.MethodDelete)
+		router.HandleFunc("/user-segments", change_user_segments.New(segment)).Methods(http.MethodPost)
+		router.HandleFunc("/user-segments/{userID}", get_user_segments.New(segment)).Methods(http.MethodGet)
+	}
+	{
+		router.HandleFunc("/log/{userID}", get_user_logs.New(logger)).Methods(http.MethodGet)
+	}
 	return router
 }
