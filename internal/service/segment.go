@@ -14,7 +14,7 @@ type segmentRepository interface {
 	AddToUser(context.Context, *model.UserSegment) error
 	DeleteFromUser(context.Context, *model.UserSegment) error
 	GetUserSegments(context.Context, uint64) ([]string, error)
-	DeleteByTTL(context.Context) error
+	DeleteByTTL(context.Context) ([]*model.UserSegment, error)
 	GetUsersBySegment(context.Context, string) ([]uint64, error)
 }
 
@@ -122,5 +122,17 @@ func (s *SegmentService) GetUserSegments(ctx context.Context,
 func (s *SegmentService) DeleteByTTL() error {
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
-	return s.repo.DeleteByTTL(ctx)
+	segments, err := s.repo.DeleteByTTL(ctx)
+	if err != nil {
+		return err
+	}
+	for _, segment := range segments {
+		_ = s.logs.Write(ctx, &model.UserLog{
+			UserID:      segment.UserID,
+			Slug:        segment.Slug,
+			Operation:   model.DeleteOp.String(),
+			RequestTime: time.Now(),
+		})
+	}
+	return nil
 }

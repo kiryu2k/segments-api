@@ -6,6 +6,7 @@ import (
 	"fmt"
 
 	"github.com/kiryu-dev/segments-api/internal/model"
+	"github.com/kiryu-dev/segments-api/pkg/util"
 )
 
 var (
@@ -92,13 +93,30 @@ func (s *segmentRepository) GetUserSegments(ctx context.Context, userID uint64) 
 	return segments, nil
 }
 
-func (s *segmentRepository) DeleteByTTL(ctx context.Context) error {
-	query := `DELETE FROM users_segments WHERE delete_time < NOW();`
-	_, err := s.db.ExecContext(ctx, query)
+func (s *segmentRepository) DeleteByTTL(ctx context.Context) ([]*model.UserSegment, error) {
+	var (
+		query = `
+DELETE FROM users_segments WHERE delete_time < NOW()
+RETURNING (user_id, slug);
+		`
+		segments = make([]*model.UserSegment, 0)
+	)
+	rows, err := s.db.QueryContext(ctx, query)
 	if err != nil {
-		return fmt.Errorf("error deleting time expired segments: %v", err)
+		return nil, fmt.Errorf("error deleting time expired segments: %v", err)
 	}
-	return nil
+	for rows.Next() {
+		buf := make([]byte, 0)
+		if err := rows.Scan(&buf); err != nil {
+			return nil, fmt.Errorf("error getting deleted users' segments: %v", err)
+		}
+		id, slug := util.ParseResponse(buf)
+		segments = append(segments, &model.UserSegment{
+			UserID: id,
+			Slug:   slug,
+		})
+	}
+	return segments, nil
 }
 
 func (s *segmentRepository) GetUsersBySegment(ctx context.Context, slug string) ([]uint64, error) {

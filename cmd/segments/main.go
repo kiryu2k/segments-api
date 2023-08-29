@@ -83,11 +83,3 @@ func setupRoutes(service *service.SegmentService) *mux.Router {
 	router.HandleFunc("/user-segments/{userID}", get_user_segments.New(service)).Methods(http.MethodGet)
 	return router
 }
-
-// type segmentService interface {
-// 	Create(context.Context, string) error
-// 	Delete(context.Context, string) error
-// 	AddToUser(context.Context, *model.UserSegments) error
-// 	DeleteFromUser(context.Context, *model.UserSegments) error
-// 	GetActiveUserSegments(context.Context, uint64) ([]string, error)
-// }
