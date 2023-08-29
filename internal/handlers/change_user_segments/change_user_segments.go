@@ -14,7 +14,7 @@ import (
 )
 
 type segmentChanger interface {
-	Change(context.Context, []*model.UserSegment, int) []error
+	Change(context.Context, []*model.UserSegment, model.OpType) []error
 }
 
 type duration struct {
@@ -67,7 +67,8 @@ func New(service segmentChanger) http.HandlerFunc {
 			}
 		}
 		var (
-			addErr = service.Change(ctx, data.ToAdd.makeSegmentModel(data.UserID), model.AddOp)
+			addErr = service.Change(ctx, data.ToAdd.
+				makeSegmentModel(data.UserID), model.AddOp)
 			offset = len(addErr)
 			delErr = service.Change(ctx, toDel, model.DeleteOp)
 			resp   = make([]*response, offset+len(delErr))
@@ -85,16 +86,11 @@ func New(service segmentChanger) http.HandlerFunc {
 	}
 }
 
-func createResponse(err error, slug string, opType int) *response {
+func createResponse(err error, slug string, op model.OpType) *response {
 	resp := &response{
 		Slug:       slug,
 		StatusCode: http.StatusOK,
-	}
-	switch opType {
-	case model.AddOp:
-		resp.OpType = "add"
-	case model.DeleteOp:
-		resp.OpType = "delete"
+		OpType:     op.String(),
 	}
 	if errors.Is(err, repository.ErrSegmentNotExists) ||
 		errors.Is(err, repository.ErrHasSegment) {

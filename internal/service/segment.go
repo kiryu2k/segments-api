@@ -15,12 +15,18 @@ type segmentRepository interface {
 	DeleteFromUser(context.Context, *model.UserSegment) error
 	GetUserSegments(context.Context, uint64) ([]string, error)
 	DeleteByTTL(context.Context) error
+	GetUsersBySegment(context.Context, string) ([]uint64, error)
+}
+
+type logsRepository interface {
+	Write(context.Context, *model.UserLog) error
 }
 
 type changeFunc func(context.Context, *model.UserSegment) error
 
 type SegmentService struct {
 	repo segmentRepository
+	logs logsRepository
 }
 
 type segmentError struct {
@@ -28,8 +34,8 @@ type segmentError struct {
 	err error
 }
 
-func New(repo segmentRepository) *SegmentService {
-	return &SegmentService{repo}
+func New(repo segmentRepository, logs logsRepository) *SegmentService {
+	return &SegmentService{repo, logs}
 }
 
 func (s *SegmentService) Create(ctx context.Context, slug string) error {
@@ -37,41 +43,58 @@ func (s *SegmentService) Create(ctx context.Context, slug string) error {
 }
 
 func (s *SegmentService) Delete(ctx context.Context, slug string) error {
-	return s.repo.Delete(ctx, slug)
+	users, _ := s.repo.GetUsersBySegment(ctx, slug)
+	if err := s.repo.Delete(ctx, slug); err != nil {
+		return err
+	}
+	for _, id := range users {
+		_ = s.logs.Write(ctx, &model.UserLog{
+			UserID:      id,
+			Slug:        slug,
+			Operation:   model.DeleteOp.String(),
+			RequestTime: time.Now(),
+		})
+	}
+	return nil
 }
 
-func (s *SegmentService) Change(ctx context.Context, seg []*model.UserSegment, opType int) []error {
+func (s *SegmentService) Change(ctx context.Context, seg []*model.UserSegment, opType model.OpType) []error {
 	var (
-		fn   changeFunc
-		errs = make([]error, len(seg))
+		result  = make([]error, len(seg))
+		errChan = s.changeSegments(ctx, seg, opType)
 	)
-	switch opType {
-	case model.AddOp:
-		fn = s.repo.AddToUser
-	case model.DeleteOp:
-		fn = s.repo.DeleteFromUser
+	for e := range errChan {
+		result[e.idx] = e.err
 	}
-	for segErr := range changeSegments(ctx, seg, fn) {
-		errs[segErr.idx] = segErr.err
-	}
-	return errs
+	return result
 }
 
-func changeSegments(ctx context.Context, seg []*model.UserSegment,
-	fn changeFunc) <-chan *segmentError {
+func (s *SegmentService) changeSegments(ctx context.Context, seg []*model.UserSegment,
+	opType model.OpType) <-chan *segmentError {
 	var (
+		fn  = s.defineChangeFunc(opType)
 		wg  = &sync.WaitGroup{}
 		out = make(chan *segmentError)
 	)
 	wg.Add(len(seg))
-	for i, s := range seg {
-		go func(ctx context.Context, i int, seg *model.UserSegment) {
+	operation := opType.String()
+	for i, segment := range seg {
+		go func(ctx context.Context, i int, segment *model.UserSegment) {
 			defer wg.Done()
+			err := fn(ctx, segment)
+			if err == nil {
+				_ = s.logs.Write(ctx, &model.UserLog{
+					UserID:      segment.UserID,
+					Slug:        segment.Slug,
+					Operation:   operation,
+					RequestTime: time.Now(),
+				})
+			}
 			out <- &segmentError{
 				idx: i,
-				err: fn(ctx, seg),
+				err: err,
 			}
-		}(ctx, i, s)
+		}(ctx, i, segment)
 	}
 	go func() {
 		wg.Wait()
@@ -80,7 +103,19 @@ func changeSegments(ctx context.Context, seg []*model.UserSegment,
 	return out
 }
 
-func (s *SegmentService) GetUserSegments(ctx context.Context, userID uint64) ([]string, error) {
+func (s *SegmentService) defineChangeFunc(opType model.OpType) changeFunc {
+	var fn changeFunc
+	switch opType {
+	case model.AddOp:
+		fn = s.repo.AddToUser
+	case model.DeleteOp:
+		fn = s.repo.DeleteFromUser
+	}
+	return fn
+}
+
+func (s *SegmentService) GetUserSegments(ctx context.Context,
+	userID uint64) ([]string, error) {
 	return s.repo.GetUserSegments(ctx, userID)
 }
 

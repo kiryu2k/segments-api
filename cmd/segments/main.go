@@ -38,8 +38,9 @@ func main() {
 	}
 	defer db.Close()
 	var (
+		logger  = repository.NewLogger(db)
 		repo    = repository.New(db)
-		service = service.New(repo)
+		service = service.New(repo, logger)
 		router  = setupRoutes(service)
 		server  = &http.Server{
 			Addr:         cfg.Address,

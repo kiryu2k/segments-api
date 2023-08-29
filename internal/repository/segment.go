@@ -13,6 +13,7 @@ var (
 	ErrSegmentNotExists = fmt.Errorf("specified segment doesn't exist")
 	ErrHasSegment       = fmt.Errorf("user already has specified segment")
 	ErrUserNotExists    = fmt.Errorf("user with specified id doesn't exist")
+	ErrNoUsers          = fmt.Errorf("there're no users with specified segment")
 )
 
 type segmentRepository struct {
@@ -123,6 +124,31 @@ func (s *segmentRepository) DeleteByTTL(ctx context.Context) error {
 		return fmt.Errorf("error deleting time expired segments: %v", err)
 	}
 	return nil
+}
+
+func (s *segmentRepository) GetUsersBySegment(ctx context.Context, slug string) ([]uint64, error) {
+	var (
+		query = `
+SELECT user_id FROM users_segments JOIN segment
+ON segment_id = id AND slug = $1;
+		`
+		users = make([]uint64, 0)
+	)
+	rows, err := s.db.QueryContext(ctx, query, slug)
+	if err != nil {
+		return nil, fmt.Errorf("error getting users by specified segment %s: %v", slug, err)
+	}
+	for rows.Next() {
+		var id uint64
+		if err := rows.Scan(&id); err != nil {
+			return nil, fmt.Errorf("error getting users by specified segment %s: %v", slug, err)
+		}
+		users = append(users, id)
+	}
+	if len(users) == 0 {
+		return nil, ErrNoUsers
+	}
+	return users, nil
 }
 
 func (s *segmentRepository) getSegmentID(ctx context.Context, slug string) (uint64, error) {

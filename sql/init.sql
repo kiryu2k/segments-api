@@ -13,5 +13,5 @@ CREATE TABLE IF NOT EXISTS logs (
     user_id INTEGER NOT NULL,
     slug TEXT NOT NULL,
     operation TEXT NOT NULL,
-    request_time TIMESTAMP NOT NULL
+    request_time TIMESTAMPTZ NOT NULL
 );
