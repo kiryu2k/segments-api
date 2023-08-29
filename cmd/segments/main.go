@@ -1,10 +1,14 @@
 package main
 
 import (
+	"context"
 	"flag"
-	"log/slog"
+	"log"
 	"net/http"
 	"os"
+	"os/signal"
+	"syscall"
+	"time"
 
 	"github.com/gorilla/mux"
 	"github.com/kiryu-dev/segments-api/internal/config"
@@ -18,20 +22,18 @@ import (
 )
 
 func main() {
-	logger := slog.New(
-		slog.NewJSONHandler(os.Stdout, &slog.HandlerOptions{Level: slog.LevelDebug}),
-	)
 	var configPath string
 	flag.StringVar(&configPath, "config", "./configs/config.yaml", "config file path")
 	flag.Parse()
 	cfg, err := config.LoadConfig(configPath)
 	if err != nil {
-		logger.Error(err.Error())
+		log.Printf("cannot load app's configuration: %v", err)
 		return
 	}
+	log.Println("connecting to database...")
 	db, err := postgres.New(&cfg.DB)
 	if err != nil {
-		logger.Error(err.Error())
+		log.Printf("unexpected database error: %v", err)
 		return
 	}
 	defer db.Close()
@@ -47,8 +49,20 @@ func main() {
 			IdleTimeout:  cfg.IdleTimeout,
 		}
 	)
-	if err := server.ListenAndServe(); err != nil {
-		logger.Error(err.Error())
+	go func() {
+		log.Println("server is starting...")
+		if err := server.ListenAndServe(); err != nil {
+			log.Printf("failed to start server: %v", err)
+		}
+	}()
+	sigChan := make(chan os.Signal, 1)
+	signal.Notify(sigChan, syscall.SIGINT, syscall.SIGTERM)
+	<-sigChan
+	log.Println("gracefully shutting down...")
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+	if err := server.Shutdown(ctx); err != nil {
+		log.Printf("failed to shutdown server: %v", err)
 	}
 }
 
