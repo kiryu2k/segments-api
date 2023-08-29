@@ -1,6 +1,9 @@
 package model
 
-import "time"
+import (
+	"fmt"
+	"time"
+)
 
 type OpType int
 
@@ -27,4 +30,8 @@ type UserLog struct {
 	Slug        string    `json:"slug"`
 	Operation   string    `json:"operation"`
 	RequestTime time.Time `json:"request_time"`
+}
+
+func (u UserLog) String() string {
+	return fmt.Sprintf("%d;%s;%s;%v", u.UserID, u.Slug, u.Operation, u.RequestTime)
 }

@@ -1,4 +1,4 @@
-package service
+package segment
 
 import (
 	"context"
@@ -24,7 +24,7 @@ type logsRepository interface {
 
 type changeFunc func(context.Context, *model.UserSegment) error
 
-type SegmentService struct {
+type Service struct {
 	repo segmentRepository
 	logs logsRepository
 }
@@ -34,15 +34,15 @@ type segmentError struct {
 	err error
 }
 
-func New(repo segmentRepository, logs logsRepository) *SegmentService {
-	return &SegmentService{repo, logs}
+func New(repo segmentRepository, logs logsRepository) *Service {
+	return &Service{repo, logs}
 }
 
-func (s *SegmentService) Create(ctx context.Context, slug string) error {
+func (s *Service) Create(ctx context.Context, slug string) error {
 	return s.repo.Create(ctx, slug)
 }
 
-func (s *SegmentService) Delete(ctx context.Context, slug string) error {
+func (s *Service) Delete(ctx context.Context, slug string) error {
 	users, _ := s.repo.GetUsersBySegment(ctx, slug)
 	if err := s.repo.Delete(ctx, slug); err != nil {
 		return err
@@ -58,7 +58,7 @@ func (s *SegmentService) Delete(ctx context.Context, slug string) error {
 	return nil
 }
 
-func (s *SegmentService) Change(ctx context.Context, seg []*model.UserSegment, opType model.OpType) []error {
+func (s *Service) Change(ctx context.Context, seg []*model.UserSegment, opType model.OpType) []error {
 	var (
 		result  = make([]error, len(seg))
 		errChan = s.changeSegments(ctx, seg, opType)
@@ -69,7 +69,7 @@ func (s *SegmentService) Change(ctx context.Context, seg []*model.UserSegment, o
 	return result
 }
 
-func (s *SegmentService) changeSegments(ctx context.Context, seg []*model.UserSegment,
+func (s *Service) changeSegments(ctx context.Context, seg []*model.UserSegment,
 	opType model.OpType) <-chan *segmentError {
 	var (
 		fn  = s.defineChangeFunc(opType)
@@ -103,7 +103,7 @@ func (s *SegmentService) changeSegments(ctx context.Context, seg []*model.UserSe
 	return out
 }
 
-func (s *SegmentService) defineChangeFunc(opType model.OpType) changeFunc {
+func (s *Service) defineChangeFunc(opType model.OpType) changeFunc {
 	var fn changeFunc
 	switch opType {
 	case model.AddOp:
@@ -114,12 +114,12 @@ func (s *SegmentService) defineChangeFunc(opType model.OpType) changeFunc {
 	return fn
 }
 
-func (s *SegmentService) GetUserSegments(ctx context.Context,
+func (s *Service) GetUserSegments(ctx context.Context,
 	userID uint64) ([]string, error) {
 	return s.repo.GetUserSegments(ctx, userID)
 }
 
-func (s *SegmentService) DeleteByTTL() error {
+func (s *Service) DeleteByTTL() error {
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
 	segments, err := s.repo.DeleteByTTL(ctx)

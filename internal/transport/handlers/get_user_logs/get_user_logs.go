@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"net/http"
 	"net/url"
+	"os"
 	"strconv"
 	"time"
 
@@ -12,7 +13,7 @@ import (
 )
 
 type logsGetter interface {
-	GetUserLogs(context.Context, uint64, time.Time) error
+	GetUserLogs(context.Context, uint64, time.Time) (string, error)
 }
 
 func New(service logsGetter) http.HandlerFunc {
@@ -32,7 +33,16 @@ func New(service logsGetter) http.HandlerFunc {
 		}
 		ctx, cancel := context.WithTimeout(r.Context(), 10*time.Second)
 		defer cancel()
-		service.GetUserLogs(ctx, userID, filterDate)
+		filename, err := service.GetUserLogs(ctx, userID, filterDate)
+		if err != nil {
+			w.WriteHeader(http.StatusInternalServerError)
+			return
+		}
+		defer os.Remove(filename)
+		w.Header().Set("Content-Disposition", fmt.Sprintf("attachment; filename=%s",
+			strconv.Quote(filename)))
+		w.Header().Set("Content-Type", "application/octet-stream")
+		http.ServeFile(w, r, filename)
 	}
 }
 
