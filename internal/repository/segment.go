@@ -45,43 +45,21 @@ func (s *segmentRepository) Delete(ctx context.Context, slug string) error {
 }
 
 func (s *segmentRepository) AddToUser(ctx context.Context, seg *model.UserSegment) error {
-	var (
-		query = `
-INSERT INTO users_segments (user_id, segment_id, delete_time)
+	query := `
+INSERT INTO users_segments (user_id, slug, delete_time)
 VALUES ($1, $2, $3);
-		`
-		segmentID, err = s.getSegmentID(ctx, seg.Slug)
-	)
-	if err == sql.ErrNoRows {
-		return ErrSegmentNotExists
-	}
-	if err != nil {
-		return fmt.Errorf("error adding segment %s to user with ID %d: %v",
-			seg.Slug, seg.UserID, err)
-	}
-	if err := s.findDublicate(ctx, seg.UserID, segmentID); err != sql.ErrNoRows {
+	`
+	err := s.findDublicate(ctx, seg.UserID, seg.Slug)
+	if err != sql.ErrNoRows {
 		return ErrHasSegment
 	}
-	_, err = s.db.ExecContext(ctx, query, seg.UserID, segmentID, seg.DeleteTime)
+	_, err = s.db.ExecContext(ctx, query, seg.UserID, seg.Slug, seg.DeleteTime)
 	return err
 }
 
 func (s *segmentRepository) DeleteFromUser(ctx context.Context, seg *model.UserSegment) error {
-	var (
-		query = `
-DELETE FROM users_segments
-WHERE user_id = $1 AND segment_id = $2;
-		`
-		segmentID, err = s.getSegmentID(ctx, seg.Slug)
-	)
-	if err == sql.ErrNoRows {
-		return ErrSegmentNotExists
-	}
-	if err != nil {
-		return fmt.Errorf("error deleting segment %s to user with ID %d: %v",
-			seg.Slug, seg.UserID, err)
-	}
-	res, err := s.db.ExecContext(ctx, query, seg.UserID, segmentID)
+	query := `DELETE FROM users_segments WHERE user_id = $1 AND slug = $2;`
+	res, err := s.db.ExecContext(ctx, query, seg.UserID, seg.Slug)
 	if err != nil {
 		return fmt.Errorf("error deleting segment %s to user with ID %d: %v",
 			seg.Slug, seg.UserID, err)
@@ -94,10 +72,7 @@ WHERE user_id = $1 AND segment_id = $2;
 
 func (s *segmentRepository) GetUserSegments(ctx context.Context, userID uint64) ([]string, error) {
 	var (
-		query = `
-SELECT slug FROM segment JOIN users_segments
-ON id = segment_id AND user_id = $1;
-		`
+		query    = `SELECT slug FROM users_segments WHERE user_id = $1;`
 		segments = make([]string, 0)
 	)
 	rows, err := s.db.QueryContext(ctx, query, userID)
@@ -128,10 +103,7 @@ func (s *segmentRepository) DeleteByTTL(ctx context.Context) error {
 
 func (s *segmentRepository) GetUsersBySegment(ctx context.Context, slug string) ([]uint64, error) {
 	var (
-		query = `
-SELECT user_id FROM users_segments JOIN segment
-ON segment_id = id AND slug = $1;
-		`
+		query = `SELECT user_id FROM users_segments WHERE slug = $1;`
 		users = make([]uint64, 0)
 	)
 	rows, err := s.db.QueryContext(ctx, query, slug)
@@ -151,15 +123,7 @@ ON segment_id = id AND slug = $1;
 	return users, nil
 }
 
-func (s *segmentRepository) getSegmentID(ctx context.Context, slug string) (uint64, error) {
-	var (
-		id    uint64
-		query = `SELECT id FROM segment WHERE slug = $1;`
-	)
-	return id, s.db.QueryRowContext(ctx, query, slug).Scan(&id)
-}
-
-func (s *segmentRepository) findDublicate(ctx context.Context, userID, segmentID uint64) error {
-	query := `SELECT user_id FROM users_segments WHERE user_id = $1 AND segment_id = $2;`
-	return s.db.QueryRowContext(ctx, query, userID, segmentID).Scan()
+func (s *segmentRepository) findDublicate(ctx context.Context, userID uint64, slug string) error {
+	query := `SELECT user_id FROM users_segments WHERE user_id = $1 AND slug = $2;`
+	return s.db.QueryRowContext(ctx, query, userID, slug).Scan()
 }

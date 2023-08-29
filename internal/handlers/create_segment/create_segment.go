@@ -5,6 +5,8 @@ import (
 	"encoding/json"
 	"net/http"
 	"time"
+
+	"github.com/kiryu-dev/segments-api/internal/validation"
 )
 
 type segmentCreator interface {
@@ -24,6 +26,11 @@ func New(service segmentCreator) http.HandlerFunc {
 			return
 		}
 		defer r.Body.Close()
+		if err := validation.ValidateSlug(data.Slug); err != nil {
+			w.WriteHeader(http.StatusBadRequest)
+			w.Write([]byte(err.Error()))
+			return
+		}
 		ctx, cancel := context.WithTimeout(r.Context(), 10*time.Second)
 		defer cancel()
 		if err := service.Create(ctx, data.Slug); err != nil {

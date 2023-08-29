@@ -1,17 +1,20 @@
 CREATE TABLE IF NOT EXISTS segment (
-    id SERIAL PRIMARY KEY,
-    slug TEXT NOT NULL UNIQUE
+    slug VARCHAR(32) PRIMARY KEY
+);
+
+CREATE TABLE IF NOT EXISTS users (
+    id INTEGER PRIMARY KEY
 );
 
 CREATE TABLE IF NOT EXISTS users_segments (
-    user_id INTEGER NOT NULL,
-    segment_id SERIAL REFERENCES segment (id) ON DELETE CASCADE,
+    user_id INTEGER REFERENCES users (id) ON DELETE CASCADE,
+    slug VARCHAR(32) REFERENCES segment (slug) ON DELETE CASCADE,
     delete_time TIMESTAMPTZ
 );
 
 CREATE TABLE IF NOT EXISTS logs (
     user_id INTEGER NOT NULL,
-    slug TEXT NOT NULL,
-    operation TEXT NOT NULL,
+    slug VARCHAR(32) NOT NULL,
+    operation VARCHAR(16) NOT NULL,
     request_time TIMESTAMPTZ NOT NULL
 );
