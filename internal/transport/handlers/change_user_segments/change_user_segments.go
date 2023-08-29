@@ -5,25 +5,21 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"io"
 	"net/http"
 	"time"
 
 	"github.com/kiryu-dev/segments-api/internal/model"
 	"github.com/kiryu-dev/segments-api/internal/repository"
+	"github.com/kiryu-dev/segments-api/internal/transport/validation"
 )
 
 type segmentChanger interface {
 	Change(context.Context, []*model.UserSegment, model.OpType) []error
 }
 
-type duration struct {
-	time.Duration
-}
-
 type segmentWithTTL struct {
-	Slug string    `json:"slug"`
-	TTL  *duration `json:"ttl"`
+	Slug string  `json:"slug"`
+	TTL  *string `json:"ttl"`
 }
 
 type segments []*segmentWithTTL
@@ -43,14 +39,11 @@ type response struct {
 
 func New(service segmentChanger) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
-		body, err := io.ReadAll(r.Body)
-		if err != nil {
-			w.WriteHeader(http.StatusInternalServerError)
-			return
-		}
+		var (
+			data = new(request)
+			err  = json.NewDecoder(r.Body).Decode(data)
+		)
 		defer r.Body.Close()
-		data := new(request)
-		err = json.Unmarshal(body, data)
 		if err != nil || len(data.ToAdd) == 0 && len(data.ToDelete) == 0 {
 			w.WriteHeader(http.StatusBadRequest)
 			w.Write([]byte("invalid data to change user's segments"))
@@ -58,8 +51,18 @@ func New(service segmentChanger) http.HandlerFunc {
 		}
 		ctx, cancel := context.WithTimeout(r.Context(), 10*time.Second)
 		defer cancel()
+		addSeg, err := data.ToAdd.toSegmentModel(data.UserID)
+		if errors.Is(err, validation.ErrRegexpErr) {
+			w.WriteHeader(http.StatusInternalServerError)
+			return
+		}
+		if err != nil {
+			w.WriteHeader(http.StatusBadRequest)
+			w.Write([]byte(err.Error()))
+			return
+		}
 		var (
-			addErr = service.Change(ctx, data.ToAdd.toSegmentModel(data.UserID), model.AddOp)
+			addErr = service.Change(ctx, addSeg, model.AddOp)
 			offset = len(addErr)
 			delErr = service.Change(ctx, slugsToSegment(data.UserID, data.ToDelete), model.DeleteOp)
 			resp   = make([]*response, offset+len(delErr))
@@ -104,36 +107,23 @@ func slugsToSegment(id uint64, slugs []string) []*model.UserSegment {
 	return result
 }
 
-func (s segments) toSegmentModel(userID uint64) []*model.UserSegment {
+func (s segments) toSegmentModel(userID uint64) ([]*model.UserSegment, error) {
 	result := make([]*model.UserSegment, len(s))
 	for i, seg := range s {
 		result[i] = &model.UserSegment{
-			UserID:     userID,
-			Slug:       seg.Slug,
-			DeleteTime: seg.TTL.toDeleteTime(),
+			UserID: userID,
+			Slug:   seg.Slug,
 		}
+		if seg.TTL == nil {
+			continue
+		}
+		ttl, err := validation.ValidateTTL(*seg.TTL)
+		fmt.Println(*seg.TTL)
+		if err != nil {
+			return nil, err
+		}
+		deleteTime := time.Now().AddDate(ttl.Years, ttl.Months, ttl.Days)
+		result[i].DeleteTime = &deleteTime
 	}
-	return result
-}
-
-func (d *duration) UnmarshalJSON(b []byte) error {
-	var v any
-	if err := json.Unmarshal(b, &v); err != nil {
-		return err
-	}
-	switch value := v.(type) {
-	case string:
-		var err error
-		d.Duration, err = time.ParseDuration(value)
-		return err
-	}
-	return fmt.Errorf("invalid duration")
-}
-
-func (d *duration) toDeleteTime() *time.Time {
-	if d != nil {
-		deleteTime := time.Now().Add(d.Duration)
-		return &deleteTime
-	}
-	return nil
+	return result, nil
 }
