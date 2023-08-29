@@ -58,22 +58,13 @@ func New(service segmentChanger) http.HandlerFunc {
 		}
 		ctx, cancel := context.WithTimeout(r.Context(), 10*time.Second)
 		defer cancel()
-		/* TODO: function that convert slice to UserSegment model */
-		toDel := make([]*model.UserSegment, len(data.ToDelete))
-		for i, slug := range data.ToDelete {
-			toDel[i] = &model.UserSegment{
-				UserID: data.UserID,
-				Slug:   slug,
-			}
-		}
 		var (
-			addErr = service.Change(ctx, data.ToAdd.
-				makeSegmentModel(data.UserID), model.AddOp)
+			addErr = service.Change(ctx, data.ToAdd.toSegmentModel(data.UserID), model.AddOp)
 			offset = len(addErr)
-			delErr = service.Change(ctx, toDel, model.DeleteOp)
+			delErr = service.Change(ctx, slugsToSegment(data.UserID, data.ToDelete), model.DeleteOp)
 			resp   = make([]*response, offset+len(delErr))
 		)
-		w.Header().Add("Content-Type", "encoding/json")
+		w.Header().Set("Content-Type", "encoding/json")
 		for i, err := range addErr {
 			resp[i] = createResponse(err, data.ToAdd[i].Slug, model.AddOp)
 		}
@@ -102,16 +93,27 @@ func createResponse(err error, slug string, op model.OpType) *response {
 	return resp
 }
 
-func (s segments) makeSegmentModel(userID uint64) []*model.UserSegment {
-	segments := make([]*model.UserSegment, len(s))
+func slugsToSegment(id uint64, slugs []string) []*model.UserSegment {
+	result := make([]*model.UserSegment, len(slugs))
+	for i, slug := range slugs {
+		result[i] = &model.UserSegment{
+			UserID: id,
+			Slug:   slug,
+		}
+	}
+	return result
+}
+
+func (s segments) toSegmentModel(userID uint64) []*model.UserSegment {
+	result := make([]*model.UserSegment, len(s))
 	for i, seg := range s {
-		segments[i] = &model.UserSegment{
+		result[i] = &model.UserSegment{
 			UserID:     userID,
 			Slug:       seg.Slug,
 			DeleteTime: seg.TTL.toDeleteTime(),
 		}
 	}
-	return segments
+	return result
 }
 
 func (d *duration) UnmarshalJSON(b []byte) error {
