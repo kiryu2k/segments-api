@@ -40,7 +40,7 @@ import (
 
 func main() {
 	var configPath string
-	flag.StringVar(&configPath, "config", "./configs/config.yaml", "config file path")
+	flag.StringVar(&configPath, "config", "./configs/config.dev.yaml", "config file path")
 	flag.Parse()
 	cfg, err := config.LoadConfig(configPath)
 	if err != nil {

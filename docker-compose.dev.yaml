@@ -1,0 +1,33 @@
+version: '3.9'
+
+services:
+  segments-api:
+    build: ./
+    command: make
+    environment:
+      - DB_PASSWORD=qwerty
+    ports:
+      - 8080:8080
+    depends_on:
+      db:
+        condition: service_healthy
+  db:
+    image: postgres
+    restart: always
+    environment:
+      - POSTGRES_USER=kirrryu
+      - POSTGRES_PASSWORD=qwerty
+      - POSTGRES_DB=segments
+      - PGDATA=/var/lib/postgresql/data/
+    ports:
+      - 5432:5432
+    volumes:
+      - db:/var/lib/postgresql/data/
+    healthcheck:
+      test: ["CMD-SHELL", "sh -c 'pg_isready -U kirrryu -d segments'"]
+      interval: 10s
+      timeout: 3s
+      retries: 3
+
+volumes:
+  db:

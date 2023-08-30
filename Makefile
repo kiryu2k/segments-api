@@ -4,7 +4,7 @@ build:
 
 .PHONY: run
 run: build
-	@./bin/segments -config ./configs/config.yaml
+	@./bin/segments -config ./configs/config.dev.yaml
 
 .PHONY: test
 test:
