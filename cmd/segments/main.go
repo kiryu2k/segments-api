@@ -14,13 +14,17 @@ import (
 	"github.com/kiryu-dev/segments-api/internal/config"
 	"github.com/kiryu-dev/segments-api/internal/repository"
 	"github.com/kiryu-dev/segments-api/internal/repository/postgres"
+	user_repo "github.com/kiryu-dev/segments-api/internal/repository/user"
 	"github.com/kiryu-dev/segments-api/internal/service/logs"
 	"github.com/kiryu-dev/segments-api/internal/service/segment"
-	"github.com/kiryu-dev/segments-api/internal/transport/handlers/change_user_segments"
-	"github.com/kiryu-dev/segments-api/internal/transport/handlers/create_segment"
-	"github.com/kiryu-dev/segments-api/internal/transport/handlers/delete_segment"
-	"github.com/kiryu-dev/segments-api/internal/transport/handlers/get_user_logs"
-	"github.com/kiryu-dev/segments-api/internal/transport/handlers/get_user_segments"
+	user_service "github.com/kiryu-dev/segments-api/internal/service/user"
+	"github.com/kiryu-dev/segments-api/internal/transport/handlers/logs/get_user_logs"
+	"github.com/kiryu-dev/segments-api/internal/transport/handlers/segment/create_segment"
+	"github.com/kiryu-dev/segments-api/internal/transport/handlers/segment/delete_segment"
+	"github.com/kiryu-dev/segments-api/internal/transport/handlers/user/change_user_segments"
+	"github.com/kiryu-dev/segments-api/internal/transport/handlers/user/create_user"
+	"github.com/kiryu-dev/segments-api/internal/transport/handlers/user/delete_user"
+	"github.com/kiryu-dev/segments-api/internal/transport/handlers/user/get_user_segments"
 )
 
 func main() {
@@ -40,12 +44,17 @@ func main() {
 	}
 	defer db.Close()
 	var (
-		loggerRepo  = repository.NewLogger(db)
+		/* repository layer */
+		logRepo     = repository.NewLogger(db)
+		userRepo    = user_repo.New(db)
 		segmentRepo = repository.New(db)
-		logger      = logs.New(loggerRepo)
-		segment     = segment.New(segmentRepo, loggerRepo)
-		router      = setupRoutes(segment, logger)
-		server      = &http.Server{
+		/* service layer */
+		logService     = logs.New(logRepo)
+		userService    = user_service.New(userRepo, logRepo)
+		segmentService = segment.New(segmentRepo, logRepo)
+		/* transport layer */
+		router = setupRoutes(segmentService, userService, logService)
+		server = &http.Server{
 			Addr:         cfg.Address,
 			Handler:      router,
 			WriteTimeout: cfg.Timeout,
@@ -55,7 +64,7 @@ func main() {
 	)
 	go func() {
 		for {
-			if err := segment.DeleteByTTL(); err != nil {
+			if err := segmentService.DeleteByTTL(); err != nil {
 				log.Println(err)
 			}
 			time.Sleep(1 * time.Minute)
@@ -78,16 +87,20 @@ func main() {
 	}
 }
 
-func setupRoutes(segment *segment.Service, logger *logs.Service) *mux.Router {
+func setupRoutes(segment *segment.Service, user *user_service.Service, log *logs.Service) *mux.Router {
 	router := mux.NewRouter()
 	{
 		router.HandleFunc("/segment", create_segment.New(segment)).Methods(http.MethodPost)
 		router.HandleFunc("/segment/{slug}", delete_segment.New(segment)).Methods(http.MethodDelete)
+	}
+	{
+		router.HandleFunc("/user", create_user.New(user)).Methods(http.MethodPost)
+		router.HandleFunc("/user/{userID}", delete_user.New(user)).Methods(http.MethodDelete)
 		router.HandleFunc("/user-segments", change_user_segments.New(segment)).Methods(http.MethodPost)
 		router.HandleFunc("/user-segments/{userID}", get_user_segments.New(segment)).Methods(http.MethodGet)
 	}
 	{
-		router.HandleFunc("/log/{userID}", get_user_logs.New(logger)).Methods(http.MethodGet)
+		router.HandleFunc("/log/{userID}", get_user_logs.New(log)).Methods(http.MethodGet)
 	}
 	return router
 }
