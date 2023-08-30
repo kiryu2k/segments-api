@@ -12,11 +12,14 @@ import (
 
 	"github.com/gorilla/mux"
 	"github.com/kiryu-dev/segments-api/internal/config"
-	"github.com/kiryu-dev/segments-api/internal/repository"
+	logs_repo "github.com/kiryu-dev/segments-api/internal/repository/logs"
 	"github.com/kiryu-dev/segments-api/internal/repository/postgres"
+	segment_repo "github.com/kiryu-dev/segments-api/internal/repository/segment"
 	user_repo "github.com/kiryu-dev/segments-api/internal/repository/user"
 	"github.com/kiryu-dev/segments-api/internal/service/logs"
+	logs_service "github.com/kiryu-dev/segments-api/internal/service/logs"
 	"github.com/kiryu-dev/segments-api/internal/service/segment"
+	segment_service "github.com/kiryu-dev/segments-api/internal/service/segment"
 	user_service "github.com/kiryu-dev/segments-api/internal/service/user"
 	"github.com/kiryu-dev/segments-api/internal/transport/handlers/logs/get_user_logs"
 	"github.com/kiryu-dev/segments-api/internal/transport/handlers/segment/create_segment"
@@ -45,13 +48,13 @@ func main() {
 	defer db.Close()
 	var (
 		/* repository layer */
-		logRepo     = repository.NewLogger(db)
+		logRepo     = logs_repo.New(db)
 		userRepo    = user_repo.New(db)
-		segmentRepo = repository.New(db)
+		segmentRepo = segment_repo.New(db)
 		/* service layer */
-		logService     = logs.New(logRepo)
+		logService     = logs_service.New(logRepo)
 		userService    = user_service.New(userRepo, logRepo)
-		segmentService = segment.New(segmentRepo, logRepo)
+		segmentService = segment_service.New(segmentRepo, userService, logRepo)
 		/* transport layer */
 		router = setupRoutes(segmentService, userService, logService)
 		server = &http.Server{
@@ -96,8 +99,8 @@ func setupRoutes(segment *segment.Service, user *user_service.Service, log *logs
 	{
 		router.HandleFunc("/user", create_user.New(user)).Methods(http.MethodPost)
 		router.HandleFunc("/user/{userID}", delete_user.New(user)).Methods(http.MethodDelete)
-		router.HandleFunc("/user-segments", change_user_segments.New(segment)).Methods(http.MethodPost)
-		router.HandleFunc("/user-segments/{userID}", get_user_segments.New(segment)).Methods(http.MethodGet)
+		router.HandleFunc("/user-segments", change_user_segments.New(user)).Methods(http.MethodPost)
+		router.HandleFunc("/user-segments/{userID}", get_user_segments.New(user)).Methods(http.MethodGet)
 	}
 	{
 		router.HandleFunc("/log/{userID}", get_user_logs.New(log)).Methods(http.MethodGet)

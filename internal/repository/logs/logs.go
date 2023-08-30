@@ -1,4 +1,4 @@
-package repository
+package logs
 
 import (
 	"context"
@@ -9,24 +9,24 @@ import (
 	"github.com/kiryu-dev/segments-api/internal/model"
 )
 
-type logsRepository struct {
+type repo struct {
 	db *sql.DB
 }
 
-func NewLogger(db *sql.DB) *logsRepository {
-	return &logsRepository{db}
+func New(db *sql.DB) *repo {
+	return &repo{db}
 }
 
-func (l *logsRepository) Write(ctx context.Context, log *model.UserLog) error {
+func (r *repo) Write(ctx context.Context, log *model.UserLog) error {
 	query := `INSERT INTO logs (user_id, slug, operation, request_time) VALUES ($1, $2, $3, $4);`
-	_, err := l.db.ExecContext(ctx, query, log.UserID, log.Slug, log.Operation, log.RequestTime)
+	_, err := r.db.ExecContext(ctx, query, log.UserID, log.Slug, log.Operation, log.RequestTime)
 	if err != nil {
 		return fmt.Errorf("failed to write log of user %d with segment %s: %v", log.UserID, log.Slug, err)
 	}
 	return nil
 }
 
-func (l *logsRepository) Read(ctx context.Context, userID uint64, date time.Time) ([]*model.UserLog, error) {
+func (r *repo) Read(ctx context.Context, userID uint64, date time.Time) ([]*model.UserLog, error) {
 	var (
 		query = `
 SELECT * FROM logs WHERE user_id = $1
@@ -36,7 +36,7 @@ ORDER BY request_time;
 		`
 		logs = make([]*model.UserLog, 0)
 	)
-	rows, err := l.db.QueryContext(ctx, query, userID, date.Year(), int(date.Month()))
+	rows, err := r.db.QueryContext(ctx, query, userID, date.Year(), int(date.Month()))
 	if err != nil {
 		return nil, fmt.Errorf("error getting logs of user %d: %v", userID, err)
 	}

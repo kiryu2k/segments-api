@@ -4,7 +4,6 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
-	"fmt"
 	"net/http"
 	"time"
 
@@ -118,7 +117,6 @@ func (s segments) toSegmentModel(userID uint64) ([]*model.UserSegment, error) {
 			continue
 		}
 		ttl, err := validation.ValidateTTL(*seg.TTL)
-		fmt.Println(*seg.TTL)
 		if err != nil {
 			return nil, err
 		}
