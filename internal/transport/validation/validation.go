@@ -10,9 +10,10 @@ import (
 const slugMaxSize = 32
 
 var (
-	ErrInvalidSize = fmt.Errorf("segment name must be less than %d characters long", slugMaxSize)
-	ErrInvalidChar = fmt.Errorf("segment name must consist only word character (alphanumeric & underscore)")
-	ErrRegexpErr   = fmt.Errorf("unexpected regexp error")
+	ErrInvalidSize       = fmt.Errorf("segment name must be less than %d characters long", slugMaxSize)
+	ErrInvalidChar       = fmt.Errorf("segment name must consist only word character (alphanumeric & underscore)")
+	ErrRegexpErr         = fmt.Errorf("unexpected regexp error")
+	ErrInvalidPercentage = fmt.Errorf("user percentage should be between 0 and 100")
 )
 
 func ValidateSlug(slug string) error {
@@ -21,7 +22,7 @@ func ValidateSlug(slug string) error {
 	}
 	match, err := regexp.MatchString(`^\w+$`, slug)
 	if err != nil {
-		return err
+		return ErrRegexpErr
 	}
 	if !match {
 		return ErrInvalidChar
@@ -45,4 +46,11 @@ func ValidateTTL(ttl string) (*parser.TTL, error) {
 		}
 	}
 	return nil, fmt.Errorf("invalid ttl format: expected something like this 1y8m16d")
+}
+
+func ValidatePercentage(percentage float64) error {
+	if percentage < 0 || percentage > 100 {
+		return ErrInvalidPercentage
+	}
+	return nil
 }

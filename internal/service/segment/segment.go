@@ -2,9 +2,11 @@ package segment
 
 import (
 	"context"
+	"sync"
 	"time"
 
 	"github.com/kiryu-dev/segments-api/internal/model"
+	"github.com/kiryu-dev/segments-api/pkg/util/selector"
 )
 
 type segmentRepository interface {
@@ -15,7 +17,8 @@ type segmentRepository interface {
 }
 
 type userRepository interface {
-	GetUserSegments(context.Context, uint64) ([]string, error)
+	GetAll(context.Context) ([]uint64, error)
+	AddSegment(context.Context, *model.UserSegment) error
 }
 
 type logsRepository interface {
@@ -28,12 +31,76 @@ type Service struct {
 	logs    logsRepository
 }
 
+type userError struct {
+	id  uint64
+	err error
+}
+
 func New(segment segmentRepository, user userRepository, logs logsRepository) *Service {
 	return &Service{segment, user, logs}
 }
 
-func (s *Service) Create(ctx context.Context, slug string) error {
-	return s.segment.Create(ctx, slug)
+func (s *Service) Create(ctx context.Context, slug string, percentage float64) ([]uint64, error) {
+	err := s.segment.Create(ctx, slug)
+	if percentage == 0 || err != nil {
+		return nil, err
+	}
+	users, err := s.user.GetAll(ctx)
+	if err != nil {
+		return nil, err
+	}
+	count := len(users)
+	if percentage != 100 {
+		count = int(percentage / 100. * float64(count))
+		if count == 0 {
+			return nil, nil
+		}
+		users, err = selector.Select(users, count)
+		if err != nil {
+			return nil, err
+		}
+	}
+	result := make([]uint64, 0)
+	for e := range s.addSegmentToUsers(ctx, users, slug) {
+		if e.err == nil {
+			result = append(result, e.id)
+		}
+	}
+	return result, nil
+}
+
+func (s *Service) addSegmentToUsers(ctx context.Context, users []uint64, slug string) <-chan *userError {
+	var (
+		wg  = &sync.WaitGroup{}
+		out = make(chan *userError)
+	)
+	wg.Add(len(users))
+	for _, user := range users {
+		go func(ctx context.Context, userID uint64) {
+			defer wg.Done()
+			err := s.user.AddSegment(ctx, &model.UserSegment{
+				UserID: userID,
+				Slug:   slug,
+			})
+			if err == nil {
+				_ = s.logs.Write(ctx, &model.UserLog{
+					UserID:      userID,
+					Slug:        slug,
+					Operation:   model.AddOp.String(),
+					RequestTime: time.Now(),
+				})
+			}
+			out <- &userError{
+				id:  userID,
+				err: err,
+			}
+		}(ctx, user)
+	}
+	go func() {
+		wg.Wait()
+		close(out)
+	}()
+	return out
 }
 
 func (s *Service) Delete(ctx context.Context, slug string) error {

@@ -54,7 +54,7 @@ func main() {
 		/* service layer */
 		logService     = logs_service.New(logRepo)
 		userService    = user_service.New(userRepo, logRepo)
-		segmentService = segment_service.New(segmentRepo, userService, logRepo)
+		segmentService = segment_service.New(segmentRepo, userRepo, logRepo)
 		/* transport layer */
 		router = setupRoutes(segmentService, userService, logService)
 		server = &http.Server{

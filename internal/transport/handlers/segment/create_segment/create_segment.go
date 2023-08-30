@@ -11,11 +11,17 @@ import (
 )
 
 type segmentCreator interface {
-	Create(context.Context, string) error
+	Create(context.Context, string, float64) ([]uint64, error)
 }
 
 type request struct {
-	Slug string `json:"slug"`
+	Slug       string  `json:"slug"`
+	Percentage float64 `json:"percentage"`
+}
+
+type response struct {
+	Slug    string   `json:"slug"`
+	UsersID []uint64 `json:"users_id"`
 }
 
 func New(service segmentCreator) http.HandlerFunc {
@@ -37,9 +43,24 @@ func New(service segmentCreator) http.HandlerFunc {
 			w.WriteHeader(http.StatusInternalServerError)
 			return
 		}
+		if err := validation.ValidatePercentage(data.Percentage); err != nil {
+			w.WriteHeader(http.StatusBadRequest)
+			w.Write([]byte(err.Error()))
+			return
+		}
 		ctx, cancel := context.WithTimeout(r.Context(), 10*time.Second)
 		defer cancel()
-		if err := service.Create(ctx, data.Slug); err != nil {
+		resp := &response{Slug: data.Slug}
+		resp.UsersID, err = service.Create(ctx, data.Slug, data.Percentage)
+		if err != nil {
+			w.WriteHeader(http.StatusInternalServerError)
+			return
+		}
+		if resp.UsersID == nil {
+			return
+		}
+		w.Header().Set("Content-Type", "application/json")
+		if err := json.NewEncoder(w).Encode(resp); err != nil {
 			w.WriteHeader(http.StatusInternalServerError)
 		}
 	}

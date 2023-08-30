@@ -85,6 +85,25 @@ func (r *repo) DeleteSegment(ctx context.Context, seg *model.UserSegment) error 
 	return nil
 }
 
+func (r *repo) GetAll(ctx context.Context) ([]uint64, error) {
+	var (
+		query = `SELECT id FROM users;`
+		users = make([]uint64, 0)
+	)
+	rows, err := r.db.QueryContext(ctx, query)
+	if err != nil {
+		return nil, fmt.Errorf("error getting users: %v", err)
+	}
+	for rows.Next() {
+		var user uint64
+		if err := rows.Scan(&user); err != nil {
+			return nil, fmt.Errorf("error getting users: %v", err)
+		}
+		users = append(users, user)
+	}
+	return users, nil
+}
+
 func (r *repo) findDublicate(ctx context.Context, userID uint64, slug string) error {
 	query := `SELECT user_id FROM users_segments WHERE user_id = $1 AND slug = $2;`
 	return r.db.QueryRowContext(ctx, query, userID, slug).Scan()
