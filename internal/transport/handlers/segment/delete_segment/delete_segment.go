@@ -33,7 +33,7 @@ func New(service segmentDeleter) http.HandlerFunc {
 		err = service.Delete(ctx, slug)
 		if errors.Is(err, repository.ErrSegmentNotExists) {
 			w.WriteHeader(http.StatusBadRequest)
-			w.Write([]byte("requested segment doesn't exist"))
+			w.Write([]byte(err.Error()))
 			return
 		}
 		if err != nil {

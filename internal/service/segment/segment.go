@@ -114,8 +114,7 @@ func (s *Service) defineChangeFunc(opType model.OpType) changeFunc {
 	return fn
 }
 
-func (s *Service) GetUserSegments(ctx context.Context,
-	userID uint64) ([]string, error) {
+func (s *Service) GetUserSegments(ctx context.Context, userID uint64) ([]string, error) {
 	return s.repo.GetUserSegments(ctx, userID)
 }
 
