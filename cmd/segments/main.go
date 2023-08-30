@@ -28,7 +28,15 @@ import (
 	"github.com/kiryu-dev/segments-api/internal/transport/handlers/user/create_user"
 	"github.com/kiryu-dev/segments-api/internal/transport/handlers/user/delete_user"
 	"github.com/kiryu-dev/segments-api/internal/transport/handlers/user/get_user_segments"
+
+	_ "github.com/kiryu-dev/segments-api/docs"
+	httpSwagger "github.com/swaggo/http-swagger"
 )
+
+//	@title		Segments API
+//	@version	1.0
+//	@host		localhost:8080
+//	@BasePath	/
 
 func main() {
 	var configPath string
@@ -104,6 +112,9 @@ func setupRoutes(segment *segment.Service, user *user_service.Service, log *logs
 	}
 	{
 		router.HandleFunc("/log/{userID}", get_user_logs.New(log)).Methods(http.MethodGet)
+	}
+	{
+		router.PathPrefix("/docs/").Handler(httpSwagger.WrapHandler)
 	}
 	return router
 }

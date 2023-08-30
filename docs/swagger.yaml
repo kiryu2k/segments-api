@@ -1,0 +1,301 @@
+basePath: /
+definitions:
+  change_user_segments.request:
+    properties:
+      to_add:
+        items:
+          $ref: '#/definitions/change_user_segments.segmentWithTTL'
+        type: array
+      to_delete:
+        items:
+          type: string
+        type: array
+      user_id:
+        type: integer
+    type: object
+  change_user_segments.response:
+    properties:
+      message:
+        type: string
+      operation_type:
+        type: string
+      slug:
+        type: string
+      status_code:
+        type: integer
+    type: object
+  change_user_segments.segmentWithTTL:
+    properties:
+      slug:
+        type: string
+      ttl:
+        type: string
+    type: object
+  create_segment.request:
+    properties:
+      percentage:
+        type: number
+      slug:
+        type: string
+    type: object
+  create_segment.response:
+    properties:
+      slug:
+        type: string
+      users_id:
+        items:
+          type: integer
+        type: array
+    type: object
+  create_user.request:
+    properties:
+      user_id:
+        type: integer
+    type: object
+  handlers.responseError:
+    properties:
+      message:
+        type: string
+      status_code:
+        type: integer
+    type: object
+host: localhost:8080
+info:
+  contact: {}
+  title: Segments API
+  version: "1.0"
+paths:
+  /log/{userID}:
+    get:
+      description: Получение истории добавления и удаления сегментов указанного пользователя
+        за определенный год и месяц в формате CSV.
+      parameters:
+      - description: user id
+        in: path
+        name: userID
+        required: true
+        type: integer
+      - description: filter date
+        format: year-month
+        in: query
+        name: date
+        type: string
+      produces:
+      - application/octet-stream
+      responses:
+        "200":
+          description: OK
+        "400":
+          description: error
+          schema:
+            $ref: '#/definitions/handlers.responseError'
+        "500":
+          description: error
+          schema:
+            $ref: '#/definitions/handlers.responseError'
+        default:
+          description: error
+          schema:
+            $ref: '#/definitions/handlers.responseError'
+      summary: Получить историю изменения сегментов пользователя
+      tags:
+      - logs
+  /segment:
+    post:
+      consumes:
+      - application/json
+      description: Метод создания сегмента. Принимает slug (название) сегмента. Опционально
+        можно указать процент пользователей, которые добавятся в этот сегмент автоматически.
+      parameters:
+      - description: segment name and user percentage (optional)
+        in: body
+        name: input
+        required: true
+        schema:
+          $ref: '#/definitions/create_segment.request'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: (optional) segment name and added users
+          schema:
+            $ref: '#/definitions/create_segment.response'
+        "400":
+          description: error
+          schema:
+            $ref: '#/definitions/handlers.responseError'
+        "500":
+          description: error
+          schema:
+            $ref: '#/definitions/handlers.responseError'
+        default:
+          description: error
+          schema:
+            $ref: '#/definitions/handlers.responseError'
+      summary: Создать новый сегмент
+      tags:
+      - segment
+  /segment/{slug}:
+    delete:
+      description: Метод удаления сегмента. Принимает slug (название) сегмента.
+      parameters:
+      - description: segment name
+        in: path
+        name: slug
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+        "400":
+          description: error
+          schema:
+            $ref: '#/definitions/handlers.responseError'
+        "500":
+          description: error
+          schema:
+            $ref: '#/definitions/handlers.responseError'
+        default:
+          description: error
+          schema:
+            $ref: '#/definitions/handlers.responseError'
+      summary: Удалить сегмент
+      tags:
+      - segment
+  /user:
+    post:
+      consumes:
+      - application/json
+      description: Метод создания пользователя. Принимает на вход id пользователя.
+      parameters:
+      - description: user id
+        in: body
+        name: input
+        required: true
+        schema:
+          $ref: '#/definitions/create_user.request'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+        "400":
+          description: error
+          schema:
+            $ref: '#/definitions/handlers.responseError'
+        "500":
+          description: error
+          schema:
+            $ref: '#/definitions/handlers.responseError'
+        default:
+          description: error
+          schema:
+            $ref: '#/definitions/handlers.responseError'
+      summary: Создать нового пользователя
+      tags:
+      - user
+  /user-segments:
+    post:
+      consumes:
+      - application/json
+      description: Метод изменения активных сегментов пользователя. Принимает список
+        slug (названий) сегментов которые нужно добавить пользователю, список slug
+        (названий) сегментов которые нужно удалить у пользователя, id пользователя.
+        Также есть возможность задать TTL для добавляемых сегментов, чтобы по истечению
+        времени они автоматически удалились у пользователя.
+      parameters:
+      - description: user id, segment's list to add (with ttl optional), segment's
+          list to delete
+        in: body
+        name: input
+        required: true
+        schema:
+          $ref: '#/definitions/change_user_segments.request'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: list of changes
+          schema:
+            $ref: '#/definitions/change_user_segments.response'
+        "400":
+          description: error
+          schema:
+            $ref: '#/definitions/handlers.responseError'
+        "500":
+          description: error
+          schema:
+            $ref: '#/definitions/handlers.responseError'
+        default:
+          description: error
+          schema:
+            $ref: '#/definitions/handlers.responseError'
+      summary: Изменить сегменты пользователя
+      tags:
+      - user
+  /user-segments/{userID}:
+    get:
+      description: Метод получения активных сегментов пользователя. Принимает на вход
+        id пользователя.
+      parameters:
+      - description: user id
+        in: path
+        name: userID
+        required: true
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: list of segments
+          schema:
+            items:
+              type: string
+            type: array
+        "400":
+          description: error
+          schema:
+            $ref: '#/definitions/handlers.responseError'
+        "500":
+          description: error
+          schema:
+            $ref: '#/definitions/handlers.responseError'
+        default:
+          description: error
+          schema:
+            $ref: '#/definitions/handlers.responseError'
+      summary: Получить активные сегменты пользователя
+      tags:
+      - user
+  /user/{userID}:
+    delete:
+      description: Метод удаления пользователя. Принимает на вход id пользователя.
+      parameters:
+      - description: user id
+        in: path
+        name: userID
+        required: true
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+        "400":
+          description: error
+          schema:
+            $ref: '#/definitions/handlers.responseError'
+        "500":
+          description: error
+          schema:
+            $ref: '#/definitions/handlers.responseError'
+        default:
+          description: error
+          schema:
+            $ref: '#/definitions/handlers.responseError'
+      summary: Удалить пользователя
+      tags:
+      - user
+swagger: "2.0"
