@@ -9,6 +9,7 @@ import (
 
 	"github.com/kiryu-dev/segments-api/internal/model"
 	"github.com/kiryu-dev/segments-api/internal/repository"
+	"github.com/kiryu-dev/segments-api/internal/transport/handlers"
 	"github.com/kiryu-dev/segments-api/internal/transport/validation"
 )
 
@@ -36,8 +37,22 @@ type response struct {
 	Message    string `json:"message"`
 }
 
+// ChangeUserSegments godoc
+//
+//	@Summary		Изменить сегменты пользователя
+//	@Description	Метод изменения активных сегментов пользователя. Принимает список slug (названий) сегментов которые нужно добавить пользователю, список slug (названий) сегментов которые нужно удалить у пользователя, id пользователя. Также есть возможность задать TTL для добавляемых сегментов, чтобы по истечению времени они автоматически удалились у пользователя.
+//	@Tags			user
+//	@Accept			json
+//	@Produce		json
+//	@Param			input	body		request					true	"user id, segment's list to add (with ttl optional), segment's list to delete"
+//	@Success		200		{object}	response				"list of changes"
+//	@Failure		400		{object}	handlers.responseError	"error"
+//	@Failure		500		{object}	handlers.responseError	"error"
+//	@Failure		default	{object}	handlers.responseError	"error"
+//	@Router			/user-segments [post]
 func New(service segmentChanger) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
 		var (
 			data = new(request)
 			err  = json.NewDecoder(r.Body).Decode(data)
@@ -45,7 +60,7 @@ func New(service segmentChanger) http.HandlerFunc {
 		defer r.Body.Close()
 		if err != nil || len(data.ToAdd) == 0 && len(data.ToDelete) == 0 {
 			w.WriteHeader(http.StatusBadRequest)
-			w.Write([]byte("invalid data to change user's segments"))
+			handlers.WriteJSONError(w, http.StatusBadRequest, "invalid data to change user's segments")
 			return
 		}
 		ctx, cancel := context.WithTimeout(r.Context(), 10*time.Second)
@@ -53,11 +68,12 @@ func New(service segmentChanger) http.HandlerFunc {
 		addSeg, err := data.ToAdd.toSegmentModel(data.UserID)
 		if errors.Is(err, validation.ErrRegexpErr) {
 			w.WriteHeader(http.StatusInternalServerError)
+			handlers.WriteServerError(w, http.StatusInternalServerError)
 			return
 		}
 		if err != nil {
 			w.WriteHeader(http.StatusBadRequest)
-			w.Write([]byte(err.Error()))
+			handlers.WriteJSONError(w, http.StatusBadRequest, err.Error())
 			return
 		}
 		var (
@@ -66,7 +82,6 @@ func New(service segmentChanger) http.HandlerFunc {
 			delErr = service.Change(ctx, slugsToSegment(data.UserID, data.ToDelete), model.DeleteOp)
 			resp   = make([]*response, offset+len(delErr))
 		)
-		w.Header().Set("Content-Type", "application/json")
 		for i, err := range addErr {
 			resp[i] = createResponse(err, data.ToAdd[i].Slug, model.AddOp)
 		}
@@ -75,6 +90,7 @@ func New(service segmentChanger) http.HandlerFunc {
 		}
 		if err := json.NewEncoder(w).Encode(resp); err != nil {
 			w.WriteHeader(http.StatusInternalServerError)
+			handlers.WriteServerError(w, http.StatusInternalServerError)
 		}
 	}
 }

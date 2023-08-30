@@ -10,25 +10,40 @@ import (
 	"time"
 
 	"github.com/gorilla/mux"
+	"github.com/kiryu-dev/segments-api/internal/transport/handlers"
 )
 
 type logsGetter interface {
 	GetUserLogs(context.Context, uint64, time.Time) (string, error)
 }
 
+// GetUserLogs godoc
+//
+//	@Summary		Получить историю изменения сегментов пользователя
+//	@Description	Получение истории добавления и удаления сегментов указанного пользователя за определенный год и месяц в формате CSV.
+//	@Tags			logs
+//	@Produce		octet-stream
+//	@Param			userID	path	int		true	"user id"
+//	@Param			date	query	string	false	"filter date"	Format(year-month)
+//	@Success		200
+//	@Failure		400		{object}	handlers.responseError	"error"
+//	@Failure		500		{object}	handlers.responseError	"error"
+//	@Failure		default	{object}	handlers.responseError	"error"
+//	@Router			/log/{userID} [get]
 func New(service logsGetter) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
 		idStr := mux.Vars(r)["userID"]
 		userID, err := strconv.ParseUint(idStr, 10, 64)
 		if err != nil {
 			w.WriteHeader(http.StatusBadRequest)
-			w.Write([]byte("invalid user id"))
+			handlers.WriteJSONError(w, http.StatusBadRequest, "invalid user id")
 			return
 		}
 		filterDate, err := getFilterDate(r.URL.Query())
 		if err != nil {
 			w.WriteHeader(http.StatusBadRequest)
-			w.Write([]byte(err.Error()))
+			handlers.WriteJSONError(w, http.StatusBadRequest, err.Error())
 			return
 		}
 		ctx, cancel := context.WithTimeout(r.Context(), 10*time.Second)
@@ -36,6 +51,7 @@ func New(service logsGetter) http.HandlerFunc {
 		filename, err := service.GetUserLogs(ctx, userID, filterDate)
 		if err != nil {
 			w.WriteHeader(http.StatusInternalServerError)
+			handlers.WriteServerError(w, http.StatusInternalServerError)
 			return
 		}
 		defer os.Remove(filename)
