@@ -9,9 +9,14 @@ docker-compose -f docker-compose.dev.yaml up
 ```
 docker-compose -f docker-compose.local.yaml up
 ```
-Сборка и запуска приложения (по умолчанию загружается конфигурация для dev-среды):
+Сборка и запуск приложения (по умолчанию загружается конфигурация для dev-среды):
 ```
 make
+```
+Сборка и запуск приложения с конфигурацией для local-среды:
+```
+make build
+./bin/segments --config ./configs/config.local.yaml
 ```
 Изменить конфигурацию для той или иной среды можно в файлах `config.dev.yaml` и `config.local.yaml` в директории `./configs`. Также обязательно создать `.env` файл с необходимыми переменными окружения (смотри `example.env`).
 ## Endpoints
